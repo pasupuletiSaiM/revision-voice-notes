@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revision Voice Notes</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9834;</text></svg>">
+<style>
+  :root{
+    --paper:#f7f4ec; --sheet:#fffdf8; --rule:#ddd6c6; --rule2:#c3b9a2;
+    --ink:#23201a; --ink2:#5c5447; --ink3:#8c8373;
+    --accent:#6b4f2a; --accent-soft:#efe7d6;
+    --red:#8c3b32; --red-soft:#f6e9e6;
+    --serif:Iowan Old Style,"Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#17150f; --sheet:#1e1b15; --rule:#332e24; --rule2:#4b4435;
+      --ink:#ece5d6; --ink2:#b3aa96; --ink3:#857d6c;
+      --accent:#cdae7d; --accent-soft:#2b2418;
+      --red:#d8928a; --red-soft:#33211e;
+    }
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);
+       font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .sheet{max-width:780px;margin:0 auto;min-height:100vh;background:var(--sheet);
+         border-left:1px solid var(--rule);border-right:1px solid var(--rule);
+         padding:36px 44px 90px}
+  @media(max-width:640px){.sheet{padding:24px 18px 70px;border:none}}
+
+  .masthead{text-align:center;border-bottom:3px double var(--rule2);padding-bottom:14px;margin-bottom:6px}
+  .masthead h1{font-size:27px;font-weight:400;letter-spacing:.055em;margin:0;text-transform:uppercase}
+  .masthead .tag{font-size:12.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink3);margin:7px 0 0}
+
+  .tools{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+         padding:9px 0;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .tools .set{display:flex;align-items:center;gap:7px}
+  .lbl{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3)}
+
+  button{font-family:var(--serif);font-size:14px;color:var(--ink);background:transparent;
+         border:1px solid var(--rule2);border-radius:2px;padding:4px 12px;cursor:pointer;line-height:1.5}
+  button:hover{background:var(--accent-soft);border-color:var(--accent)}
+  button:active{transform:translateY(1px)}
+  button.solid{background:var(--ink);color:var(--sheet);border-color:var(--ink)}
+  button.solid:hover{background:var(--accent);border-color:var(--accent);color:var(--sheet)}
+  button.warn{color:var(--red);border-color:var(--red)}
+  button.warn:hover{background:var(--red-soft)}
+  button.bare{border:none;padding:2px 6px;font-size:14px;color:var(--ink3);background:none}
+  button.bare:hover{color:var(--accent);background:none;text-decoration:underline}
+  button.bare.rm:hover{color:var(--red)}
+  select,input[type=text],input[type=search]{font-family:var(--serif);font-size:15px;color:var(--ink);
+    background:var(--sheet);border:1px solid var(--rule2);border-radius:2px;padding:5px 9px}
+  input[type=text],input[type=search]{width:100%}
+  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent-soft)}
+
+  .crumb{font-size:13px;color:var(--ink3);font-style:italic;margin:0 0 16px}
+  .crumb a{color:var(--ink2);cursor:pointer;text-decoration:none;border-bottom:1px dotted var(--rule2)}
+  .crumb a:hover{color:var(--accent);border-color:var(--accent)}
+
+  .seek{display:flex;gap:9px;align-items:center;margin-bottom:22px}
+  .seek .grow{flex:1}
+
+  .index{border-top:1px solid var(--rule2)}
+  .entry{display:flex;align-items:baseline;gap:12px;padding:11px 2px;border-bottom:1px solid var(--rule);cursor:pointer}
+  .entry:hover{background:var(--accent-soft)}
+  .num{font-size:12px;color:var(--ink3);width:26px;flex:none;font-variant-numeric:tabular-nums}
+  .ttl{flex:1;font-size:18px;word-break:break-word}
+  .dots{flex:1;border-bottom:1px dotted var(--rule2);min-width:18px;transform:translateY(-4px)}
+  .cnt{font-size:13px;color:var(--ink3);font-style:italic;white-space:nowrap}
+  .acts{display:flex;gap:2px;opacity:0;transition:opacity .12s}
+  .entry:hover .acts,.card:hover .acts,.take:hover .acts{opacity:1}
+
+  .card{border:1px solid var(--rule2);border-radius:2px;background:var(--sheet);margin-bottom:18px}
+  .card>.head{display:flex;align-items:baseline;gap:10px;padding:11px 14px;border-bottom:1px solid var(--rule);
+              background:var(--accent-soft)}
+  .card>.head .ttl{font-size:17px;letter-spacing:.02em}
+  .body{padding:4px 14px 13px}
+  .take{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dotted var(--rule)}
+  .take:last-of-type{border-bottom:none}
+  .take .nm{flex:1;font-size:16px;word-break:break-word}
+  .take .sub{font-size:12.5px;color:var(--ink3);font-style:italic;margin-top:1px}
+  .play{width:30px;height:30px;flex:none;border-radius:50%;border:1px solid var(--rule2);background:transparent;
+        cursor:pointer;font-size:11px;color:var(--ink);display:flex;align-items:center;justify-content:center;padding:0}
+  .play:hover{background:var(--accent-soft);border-color:var(--accent)}
+  .play.on{background:var(--ink);color:var(--sheet);border-color:var(--ink)}
+
+  .void{text-align:center;color:var(--ink3);font-style:italic;padding:34px 10px;font-size:15px}
+  .rule-note{font-size:13px;color:var(--ink3);font-style:italic;text-align:center;
+             border-top:1px solid var(--rule);margin-top:34px;padding-top:12px}
+
+  dialog{border:1px solid var(--rule2);border-radius:2px;background:var(--sheet);color:var(--ink);
+         padding:0;max-width:430px;width:calc(100% - 36px);font-family:var(--serif);
+         box-shadow:0 10px 34px rgba(0,0,0,.22)}
+  dialog::backdrop{background:rgba(35,30,22,.5)}
+  dialog .dh{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:var(--ink3);
+             padding:11px 20px;border-bottom:1px solid var(--rule);background:var(--accent-soft)}
+  dialog .dc{padding:17px 20px 20px}
+  dialog p{margin:0 0 13px;font-size:15px;color:var(--ink2)}
+  .dact{display:flex;gap:8px;justify-content:flex-end;margin-top:17px;padding-top:13px;border-top:1px solid var(--rule)}
+  .live{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--red);font-variant-numeric:tabular-nums}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--red);animation:b 1s infinite}
+  @keyframes b{50%{opacity:.2}}
+  .ready{margin-top:13px;font-size:14px;color:var(--ink2);font-style:italic;
+         border-left:2px solid var(--accent);padding-left:10px}
+  .or{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--sheet);
+         font-size:14px;padding:8px 18px;border-radius:2px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50}
+  .toast.show{opacity:1}
+  .alarm{border:1px solid var(--red);background:var(--red-soft);color:var(--red);
+         padding:12px 15px;margin-bottom:20px;font-size:14.5px;line-height:1.55;border-radius:2px}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="masthead">
+    <h1 id="title">Revision Voice Notes</h1>
+    <p class="tag" id="tagline">Spoken index of methods &amp; approaches</p>
+  </div>
+
+  <div class="tools">
+    <div class="set">
+      <span class="lbl">Speed</span>
+      <select id="speed">
+        <option value="1">1×</option><option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option><option value="2">2×</option>
+      </select>
+    </div>
+    <div class="set">
+      <button id="exportBtn">Export backup</button>
+      <button id="importBtn">Import</button>
+    </div>
+  </div>
+
+  <p class="crumb" id="crumb"></p>
+  <div class="seek">
+    <span class="grow"><input type="search" id="search" placeholder="Search the index…"></span>
+    <button id="addBtn" class="solid">New</button>
+  </div>
+  <div id="view"></div>
+  <p class="rule-note" id="foot"></p>
+</div>
+
+<dialog id="prompt">
+  <div class="dh" id="pTitle">Name</div>
+  <div class="dc">
+    <p id="pDesc" style="display:none"></p>
+    <input type="text" id="pInput" autocomplete="off">
+    <div class="dact"><button id="pCancel">Cancel</button><button id="pOk" class="solid">Save</button></div>
+  </div>
+</dialog>
+
+<dialog id="confirm">
+  <div class="dh" id="cTitle">Confirm</div>
+  <div class="dc">
+    <p id="cDesc"></p>
+    <div class="dact"><button id="cCancel">Keep it</button><button id="cOk" class="warn">Delete</button></div>
+  </div>
+</dialog>
+
+<dialog id="recDlg">
+  <div class="dh">Add an approach</div>
+  <div class="dc">
+    <p id="recFor"></p>
+    <input type="text" id="recName" placeholder="e.g. Via DFS (recursion stack)">
+    <div style="margin-top:15px;display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+      <button id="recStart">● Record</button>
+      <button id="recStop" style="display:none" class="warn">■ Stop</button>
+      <span id="recLive" style="display:none" class="live"><span class="dot"></span><span id="recTime">0:00</span></span>
+      <span class="or">or</span>
+      <button id="recUpload">Upload a file</button>
+      <input type="file" id="recFile" accept="audio/*" style="display:none">
+    </div>
+    <div id="recReady" class="ready" style="display:none"></div>
+    <div class="dact"><button id="recCancel">Cancel</button><button id="recSave" class="solid">Save</button></div>
+  </div>
+</dialog>
+
+<input type="file" id="importFile" accept="application/json" style="display:none">
+<div class="toast" id="toast"></div>
+
+<script>
+const DB_NAME='revnotes', STORE_META='meta', STORE_BLOB='blobs';
+let db, tree=[], path=[], speed=1, audio=null, playingId=null, memoryMode=false;
+const memBlobs={};
+
+function openDB(){return new Promise((res,rej)=>{
+  let r; try{r=indexedDB.open(DB_NAME,1);}catch(e){return rej(e);}
+  r.onupgradeneeded=()=>{const d=r.result;
+    if(!d.objectStoreNames.contains(STORE_META))d.createObjectStore(STORE_META);
+    if(!d.objectStoreNames.contains(STORE_BLOB))d.createObjectStore(STORE_BLOB);};
+  r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error||new Error('idb'));
+  setTimeout(()=>rej(new Error('timeout')),4000);});}
+function tx(s,m){return db.transaction(s,m).objectStore(s);}
+function idbGet(s,k){if(memoryMode)return Promise.resolve(s===STORE_BLOB?memBlobs[k]:undefined);
+  return new Promise((res,rej)=>{const r=tx(s,'readonly').get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+function idbPut(s,k,v){if(memoryMode){if(s===STORE_BLOB)memBlobs[k]=v;return Promise.resolve();}
+  return new Promise((res,rej)=>{const r=tx(s,'readwrite').put(v,k);r.onsuccess=()=>res();r.onerror=()=>rej(r.error);});}
+function idbDel(s,k){if(memoryMode){delete memBlobs[k];return Promise.resolve();}
+  return new Promise((res,rej)=>{const r=tx(s,'readwrite').delete(k);r.onsuccess=()=>res();r.onerror=()=>rej(r.error);});}
+
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const save=()=>idbPut(STORE_META,'tree',tree).catch(()=>{});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtDur=s=>{s=Math.round(s||0);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+const fmtDate=t=>new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
+const plural=(n,w)=>n+' '+w+(n===1?'':'s');
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');
+  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2000);}
+
+function askName(title,initial,desc){return new Promise(res=>{
+  const d=document.getElementById('prompt');
+  let done=false;
+  const finish=v=>{if(done)return;done=true;d.onclose=null;if(d.open)d.close();res(v);};
+  document.getElementById('pTitle').textContent=title;
+  const dd=document.getElementById('pDesc');
+  dd.style.display=desc?'block':'none'; dd.textContent=desc||'';
+  const i=document.getElementById('pInput'); i.value=initial||'';
+  const ok=()=>{const v=i.value.trim(); if(!v){i.focus();return;} finish(v);};
+  document.getElementById('pOk').onclick=ok;
+  i.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ok();}};
+  document.getElementById('pCancel').onclick=()=>finish(null);
+  d.onclose=()=>finish(null);
+  d.showModal(); setTimeout(()=>{i.focus();i.select();},30);});}
+
+function askConfirm(title,desc){return new Promise(res=>{
+  const d=document.getElementById('confirm');
+  let done=false;
+  const finish=v=>{if(done)return;done=true;d.onclose=null;if(d.open)d.close();res(v);};
+  document.getElementById('cTitle').textContent=title;
+  document.getElementById('cDesc').textContent=desc;
+  document.getElementById('cOk').onclick=()=>finish(true);
+  document.getElementById('cCancel').onclick=()=>finish(false);
+  d.onclose=()=>finish(false);
+  d.showModal();});}
+
+function node(){
+  if(!path[0])return{kind:'root'};
+  const f=tree.find(x=>x.id===path[0]); if(!f){path=[];return{kind:'root'};}
+  if(!path[1])return{kind:'folder',obj:f};
+  const t=f.topics.find(x=>x.id===path[1]); if(!t){path=[f.id];return{kind:'folder',obj:f};}
+  return{kind:'topic',obj:t,parent:f};}
+
+function countRecs(o){
+  if(o.topics)return o.topics.reduce((a,t)=>a+countRecs(t),0);
+  if(o.methods)return o.methods.reduce((a,m)=>a+m.recs.length,0);
+  return 0;}
+function totalRecs(){return tree.reduce((a,f)=>a+countRecs(f),0);}
+
+function render(){
+  const q=document.getElementById('search').value.trim().toLowerCase();
+  const v=document.getElementById('view');
+  const foot=document.getElementById('foot');
+  if(q){renderSearch(q,v);foot.textContent='';return;}
+  const n=node();
+  const f=n.kind==='root'?null:(n.kind==='folder'?n.obj:n.parent);
+  const t=n.kind==='topic'?n.obj:null;
+  document.getElementById('title').textContent=t?t.name:(f?f.name:'Revision Voice Notes');
+  document.getElementById('tagline').textContent=t?(f.name+' — approaches'):(f?'Topics in this section':'Spoken index of methods & approaches');
+  const cr=document.getElementById('crumb');
+  cr.innerHTML=!f?'':('<a data-nav="">Index</a> &nbsp;›&nbsp; '+(t?'<a data-nav="'+f.id+'">'+esc(f.name)+'</a> &nbsp;›&nbsp; '+esc(t.name):esc(f.name)));
+  cr.querySelectorAll('[data-nav]').forEach(a=>a.onclick=()=>{path=a.dataset.nav?[a.dataset.nav]:[];render();});
+  const add=document.getElementById('addBtn');
+  add.textContent=n.kind==='root'?'New section':n.kind==='folder'?'New topic':'New method';
+
+  if(n.kind==='root'){
+    foot.textContent=tree.length?plural(tree.length,'section')+' · '+plural(totalRecs(),'recording')+' in all':'';
+    v.innerHTML=tree.length?'<div class="index">'+tree.map((f,i)=>
+      `<div class="entry" data-id="${f.id}"><span class="num">${String(i+1).padStart(2,'0')}</span>
+        <span class="ttl">${esc(f.name)}</span><span class="dots"></span>
+        <span class="cnt">${plural(f.topics.length,'topic')}, ${plural(countRecs(f),'recording')}</span>
+        <span class="acts"><button class="bare" data-act="rename">rename</button><button class="bare rm" data-act="del">delete</button></span>
+      </div>`).join('')+'</div>'
+      :'<p class="void">The index is empty. Start a section — Graphs, DP, SQL.</p>';
+    v.querySelectorAll('.entry').forEach(el=>el.onclick=e=>{
+      const a=e.target.closest('[data-act]');
+      const f=tree.find(x=>x.id===el.dataset.id);
+      if(!a){path=[f.id];render();return;}
+      a.dataset.act==='rename'?renameIt(f,'section'):delFolder(f);});
+    return;}
+
+  if(n.kind==='folder'){
+    const fo=n.obj;
+    foot.textContent=fo.topics.length?plural(countRecs(fo),'recording')+' under '+fo.name:'';
+    v.innerHTML=fo.topics.length?'<div class="index">'+fo.topics.map((tp,i)=>
+      `<div class="entry" data-id="${tp.id}"><span class="num">${String(i+1).padStart(2,'0')}</span>
+        <span class="ttl">${esc(tp.name)}</span><span class="dots"></span>
+        <span class="cnt">${plural(tp.methods.length,'method')}, ${plural(countRecs(tp),'recording')}</span>
+        <span class="acts"><button class="bare" data-act="rename">rename</button><button class="bare rm" data-act="del">delete</button></span>
+      </div>`).join('')+'</div>'
+      :'<p class="void">No topics here yet. Add one — DFS, BFS, cycle detection.</p>';
+    v.querySelectorAll('.entry').forEach(el=>el.onclick=e=>{
+      const a=e.target.closest('[data-act]');
+      const tp=fo.topics.find(x=>x.id===el.dataset.id);
+      if(!a){path=[fo.id,tp.id];render();return;}
+      a.dataset.act==='rename'?renameIt(tp,'topic'):delTopic(fo,tp);});
+    return;}
+
+  const tp=n.obj;
+  foot.textContent=tp.methods.length?plural(countRecs(tp),'recording')+' under '+tp.name:'';
+  v.innerHTML=tp.methods.length?tp.methods.map(m=>
+    `<div class="card" data-id="${m.id}">
+       <div class="head"><span class="ttl">${esc(m.name)}</span><span class="dots"></span>
+         <span class="cnt">${plural(m.recs.length,'recording')}</span>
+         <span class="acts"><button class="bare" data-act="rename">rename</button><button class="bare rm" data-act="del">delete</button></span></div>
+       <div class="body">
+         ${m.recs.length?m.recs.map(r=>
+           `<div class="take" data-rid="${r.id}">
+              <button class="play${playingId===r.id?' on':''}" data-act="play" aria-label="Play">${playingId===r.id?'❚❚':'▶'}</button>
+              <span class="nm">${esc(r.name)}<div class="sub">${fmtDur(r.dur)} · recorded ${fmtDate(r.ts)}</div></span>
+              <span class="acts"><button class="bare" data-act="rrename">rename</button><button class="bare rm" data-act="rdel">delete</button></span>
+            </div>`).join('')
+          :'<p class="void" style="padding:18px 6px">Nothing recorded for this method yet.</p>'}
+         <div style="margin-top:12px"><button data-act="add">+ Add approach</button></div>
+       </div>
+     </div>`).join('')
+    :'<p class="void">No methods yet. Add one — “Via DFS”, “Via BFS”.</p>';
+  v.querySelectorAll('.card').forEach(el=>{
+    const m=tp.methods.find(x=>x.id===el.dataset.id);
+    el.onclick=e=>{const a=e.target.closest('[data-act]');if(!a)return;
+      const act=a.dataset.act;
+      if(act==='rename')return renameIt(m,'method');
+      if(act==='del')return delMethod(tp,m);
+      if(act==='add')return addRec(m);
+      const r=m.recs.find(x=>x.id===a.closest('.take').dataset.rid);
+      if(act==='play')return play(r);
+      if(act==='rrename')return renameIt(r,'recording');
+      if(act==='rdel')return delRec(m,r);};});}
+
+function renderSearch(q,v){
+  document.getElementById('crumb').innerHTML='<a data-nav="">← back to the index</a>';
+  document.getElementById('crumb').querySelector('a').onclick=()=>{
+    document.getElementById('search').value='';render();};
+  document.getElementById('title').textContent='Search';
+  document.getElementById('tagline').textContent='Matches for “'+q+'”';
+  const out=[];
+  tree.forEach(f=>{
+    if(f.name.toLowerCase().includes(q))out.push({k:'Section',n:f.name,w:'',go:[f.id]});
+    f.topics.forEach(tp=>{
+      if(tp.name.toLowerCase().includes(q))out.push({k:'Topic',n:tp.name,w:f.name,go:[f.id,tp.id]});
+      tp.methods.forEach(m=>{
+        if(m.name.toLowerCase().includes(q))out.push({k:'Method',n:m.name,w:f.name+' › '+tp.name,go:[f.id,tp.id]});
+        m.recs.forEach(r=>{if(r.name.toLowerCase().includes(q))
+          out.push({k:'Recording',n:r.name,w:f.name+' › '+tp.name+' › '+m.name,go:[f.id,tp.id]});});});});});
+  v.innerHTML=out.length?'<div class="index">'+out.map((o,i)=>
+    `<div class="entry" data-i="${i}"><span class="num">${String(i+1).padStart(2,'0')}</span>
+      <span class="ttl">${esc(o.n)}${o.w?'<div class="sub" style="font-size:12.5px;color:var(--ink3);font-style:italic">'+esc(o.w)+'</div>':''}</span>
+      <span class="dots"></span><span class="cnt">${o.k}</span></div>`).join('')+'</div>'
+    :'<p class="void">Nothing in the index matches that.</p>';
+  v.querySelectorAll('.entry').forEach(el=>el.onclick=()=>{
+    path=out[+el.dataset.i].go;document.getElementById('search').value='';render();});}
+
+async function renameIt(obj,kind){
+  const nm=await askName('Rename '+kind,obj.name); if(!nm)return;
+  obj.name=nm; await save(); render(); toast('Renamed');}
+
+async function delFolder(f){const n=countRecs(f);
+  if(!await askConfirm('Delete section',`“${f.name}” and all ${plural(n,'recording')} inside it will be removed. This cannot be undone.`))return;
+  for(const t of f.topics)for(const m of t.methods)for(const r of m.recs)await idbDel(STORE_BLOB,r.blobId);
+  tree=tree.filter(x=>x.id!==f.id); await save(); render(); toast('Section deleted');}
+
+async function delTopic(f,t){const n=countRecs(t);
+  if(!await askConfirm('Delete topic',`“${t.name}” and all ${plural(n,'recording')} inside it will be removed. This cannot be undone.`))return;
+  for(const m of t.methods)for(const r of m.recs)await idbDel(STORE_BLOB,r.blobId);
+  f.topics=f.topics.filter(x=>x.id!==t.id); await save(); render(); toast('Topic deleted');}
+
+async function delMethod(t,m){
+  if(!await askConfirm('Delete method',`“${m.name}” and its ${plural(m.recs.length,'recording')} will be removed. This cannot be undone.`))return;
+  for(const r of m.recs)await idbDel(STORE_BLOB,r.blobId);
+  t.methods=t.methods.filter(x=>x.id!==m.id); await save(); render(); toast('Method deleted');}
+
+async function delRec(m,r){
+  if(!await askConfirm('Delete recording',`“${r.name}” will be removed. This cannot be undone.`))return;
+  if(playingId===r.id)stopAudio();
+  await idbDel(STORE_BLOB,r.blobId);
+  m.recs=m.recs.filter(x=>x.id!==r.id); await save(); render(); toast('Recording deleted');}
+
+function stopAudio(){if(audio){audio.pause();try{URL.revokeObjectURL(audio.src);}catch(e){}audio=null;}playingId=null;}
+
+async function play(r){
+  if(playingId===r.id){stopAudio();render();return;}
+  stopAudio();
+  const blob=await idbGet(STORE_BLOB,r.blobId);
+  if(!blob){toast('That audio is missing — restore a backup');return;}
+  audio=new Audio(URL.createObjectURL(blob));
+  audio.playbackRate=speed;
+  audio.onended=()=>{stopAudio();render();};
+  audio.play().catch(()=>{toast('Could not play this file');stopAudio();render();});
+  playingId=r.id; render();}
+
+let mediaRec=null,chunks=[],pendingBlob=null,pendingDur=0,recTimer=null,recT0=0,recTarget=null;
+
+function addRec(m){
+  recTarget=m;pendingBlob=null;pendingDur=0;
+  document.getElementById('recFor').textContent='Filed under “'+m.name+'”.';
+  document.getElementById('recName').value='';
+  document.getElementById('recReady').style.display='none';
+  const st=document.getElementById('recStart');
+  st.style.display='';st.textContent='● Record';
+  document.getElementById('recStop').style.display='none';
+  document.getElementById('recLive').style.display='none';
+  document.getElementById('recDlg').showModal();
+  setTimeout(()=>document.getElementById('recName').focus(),30);}
+
+document.getElementById('recStart').onclick=async()=>{
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    chunks=[];mediaRec=new MediaRecorder(stream);
+    mediaRec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+    mediaRec.onstop=()=>{
+      pendingBlob=new Blob(chunks,{type:mediaRec.mimeType||'audio/webm'});
+      pendingDur=(Date.now()-recT0)/1000;
+      stream.getTracks().forEach(t=>t.stop());
+      const rd=document.getElementById('recReady');
+      rd.style.display='block';rd.textContent='Recorded '+fmtDur(pendingDur)+'. Name it, then save.';};
+    mediaRec.start();recT0=Date.now();
+    document.getElementById('recStart').style.display='none';
+    document.getElementById('recStop').style.display='';
+    document.getElementById('recLive').style.display='flex';
+    recTimer=setInterval(()=>{document.getElementById('recTime').textContent=fmtDur((Date.now()-recT0)/1000);},300);
+  }catch(e){toast('Microphone blocked — allow access, or upload a file');}};
+
+document.getElementById('recStop').onclick=()=>{
+  if(mediaRec&&mediaRec.state!=='inactive')mediaRec.stop();
+  clearInterval(recTimer);
+  document.getElementById('recStop').style.display='none';
+  document.getElementById('recLive').style.display='none';
+  const st=document.getElementById('recStart');
+  st.style.display='';st.textContent='● Record again';};
+
+document.getElementById('recUpload').onclick=()=>document.getElementById('recFile').click();
+document.getElementById('recFile').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  pendingBlob=f;
+  const a=new Audio(URL.createObjectURL(f));
+  const rd=document.getElementById('recReady');
+  rd.style.display='block';rd.textContent=f.name+' ready. Name it, then save.';
+  a.onloadedmetadata=()=>{pendingDur=isFinite(a.duration)?a.duration:0;
+    rd.textContent=f.name+' ready ('+fmtDur(pendingDur)+'). Name it, then save.';};
+  if(!document.getElementById('recName').value.trim())
+    document.getElementById('recName').value=f.name.replace(/\.[^.]+$/,'');
+  e.target.value='';};
+
+document.getElementById('recCancel').onclick=()=>{
+  if(mediaRec&&mediaRec.state!=='inactive')mediaRec.stop();
+  clearInterval(recTimer);document.getElementById('recDlg').close();};
+
+document.getElementById('recSave').onclick=async()=>{
+  const nm=document.getElementById('recName').value.trim();
+  if(!nm){toast('Give this approach a name');document.getElementById('recName').focus();return;}
+  if(!pendingBlob){toast('Record or upload audio first');return;}
+  const blobId=uid();
+  await idbPut(STORE_BLOB,blobId,pendingBlob);
+  recTarget.recs.push({id:uid(),name:nm,dur:pendingDur,ts:Date.now(),blobId,mime:pendingBlob.type||'audio/webm'});
+  await save();document.getElementById('recDlg').close();render();toast('Saved');};
+
+document.getElementById('addBtn').onclick=async()=>{
+  const n=node();
+  if(n.kind==='root'){const nm=await askName('New section','','A broad area — Graphs, DP, SQL.');if(!nm)return;
+    tree.push({id:uid(),name:nm,topics:[]});}
+  else if(n.kind==='folder'){const nm=await askName('New topic','','A concept — DFS, cycle detection.');if(!nm)return;
+    n.obj.topics.push({id:uid(),name:nm,methods:[]});}
+  else{const nm=await askName('New method','','A way of solving it — Via DFS, Via BFS.');if(!nm)return;
+    n.obj.methods.push({id:uid(),name:nm,recs:[]});}
+  await save();render();};
+
+document.getElementById('search').oninput=render;
+document.getElementById('speed').onchange=e=>{speed=parseFloat(e.target.value);if(audio)audio.playbackRate=speed;};
+
+document.getElementById('exportBtn').onclick=async()=>{
+  if(!totalRecs()&&!tree.length){toast('Nothing to back up yet');return;}
+  toast('Preparing the backup…');
+  const blobs={};
+  for(const f of tree)for(const t of f.topics)for(const m of t.methods)for(const r of m.recs){
+    const b=await idbGet(STORE_BLOB,r.blobId);if(!b)continue;
+    blobs[r.blobId]=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(b);});}
+  const url=URL.createObjectURL(new Blob([JSON.stringify({v:1,exported:Date.now(),tree,blobs})],{type:'application/json'}));
+  const a=document.createElement('a');
+  a.href=url;a.download='revision-notes-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('Backup downloaded');};
+
+document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
+document.getElementById('importFile').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  if(!await askConfirm('Import backup','Everything in the file is added alongside what you already have. Nothing is deleted.'))return;
+  try{
+    const data=JSON.parse(await f.text());
+    if(!Array.isArray(data.tree))throw new Error('bad');
+    for(const k in (data.blobs||{})){
+      const r=await fetch(data.blobs[k]);await idbPut(STORE_BLOB,k,await r.blob());}
+    data.tree.forEach(fo=>{fo.id=fo.id||uid();tree.push(fo);});
+    await save();render();toast('Backup imported');
+  }catch(err){toast('That file could not be read');}};
+
+(async()=>{
+  try{
+    db=await openDB();
+    tree=(await idbGet(STORE_META,'tree'))||[];
+    if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+  }catch(e){
+    memoryMode=true;tree=[];
+    const w=document.createElement('div');
+    w.className='alarm';
+    w.innerHTML='<b>Nothing will be saved right now.</b><br>This browser blocks storage for pages opened straight off the disk. Open the published web address instead, where saving works normally. Everything on this page still works, but it will be lost on refresh.';
+    document.querySelector('.sheet').insertBefore(w,document.querySelector('.crumb'));
+  }
+  render();
+})();
+</script>
+</body>
+</html>
