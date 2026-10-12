@@ -178,13 +178,30 @@
   </div>
 </dialog>
 
+<dialog id="authDlg">
+  <div class="dh">Sign in</div>
+  <div class="dc">
+    <p id="authMsg">Your recordings sync across devices once you sign in.</p>
+    <input type="text" id="authEmail" placeholder="you@example.com" autocomplete="username" style="margin-bottom:9px">
+    <input type="password" id="authPass" placeholder="Password (6+ characters)" autocomplete="current-password">
+    <div id="authErr" style="display:none;color:var(--red);font-size:14px;margin-top:10px"></div>
+    <div class="dact">
+      <button id="authSignup">Create account</button>
+      <button id="authLogin" class="solid">Sign in</button>
+    </div>
+  </div>
+</dialog>
+
 <input type="file" id="importFile" accept="application/json" style="display:none">
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
 <script>
 const DB_NAME='revnotes', STORE_META='meta', STORE_BLOB='blobs';
 let db, tree=[], path=[], speed=1, audio=null, playingId=null, memoryMode=false;
 const memBlobs={};
+let sb=null, user=null, cloud=false, urlCache={};
 
 function openDB(){return new Promise((res,rej)=>{
   let r; try{r=indexedDB.open(DB_NAME,1);}catch(e){return rej(e);}
@@ -202,7 +219,42 @@ function idbDel(s,k){if(memoryMode){delete memBlobs[k];return Promise.resolve();
   return new Promise((res,rej)=>{const r=tx(s,'readwrite').delete(k);r.onsuccess=()=>res();r.onerror=()=>rej(r.error);});}
 
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-const save=()=>idbPut(STORE_META,'tree',tree).catch(()=>{});
+async function save(){
+  if(cloud&&user){
+    const {error}=await sb.from('notebooks')
+      .upsert({user_id:user.id,tree,updated_at:new Date().toISOString()});
+    if(error){toast('Could not save to the cloud — check your connection');return;}
+    return;
+  }
+  return idbPut(STORE_META,'tree',tree).catch(()=>{});}
+
+async function putAudio(blobId,blob){
+  if(cloud&&user){
+    const {error}=await sb.storage.from('recordings')
+      .upload(user.id+'/'+blobId,blob,{contentType:blob.type||'audio/webm',upsert:true});
+    if(error)throw error;
+    return;
+  }
+  return idbPut(STORE_BLOB,blobId,blob);}
+
+async function getAudio(blobId){
+  if(cloud&&user){
+    if(urlCache[blobId])return urlCache[blobId];
+    const {data,error}=await sb.storage.from('recordings')
+      .createSignedUrl(user.id+'/'+blobId,3600);
+    if(error||!data)return null;
+    urlCache[blobId]=data.signedUrl;
+    return data.signedUrl;
+  }
+  return idbGet(STORE_BLOB,blobId);}
+
+async function delAudio(blobId){
+  if(cloud&&user){
+    delete urlCache[blobId];
+    await sb.storage.from('recordings').remove([user.id+'/'+blobId]).catch(()=>{});
+    return;
+  }
+  return idbDel(STORE_BLOB,blobId);}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmtDur=s=>{s=Math.round(s||0);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
 const fmtDate=t=>new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
@@ -358,33 +410,34 @@ async function renameIt(obj,kind){
 
 async function delFolder(f){const n=countRecs(f);
   if(!await askConfirm('Delete section',`“${f.name}” and all ${plural(n,'recording')} inside it will be removed. This cannot be undone.`))return;
-  for(const t of f.topics)for(const m of t.methods)for(const r of m.recs)await idbDel(STORE_BLOB,r.blobId);
+  for(const t of f.topics)for(const m of t.methods)for(const r of m.recs)await delAudio(r.blobId);
   tree=tree.filter(x=>x.id!==f.id); await save(); render(); toast('Section deleted');}
 
 async function delTopic(f,t){const n=countRecs(t);
   if(!await askConfirm('Delete topic',`“${t.name}” and all ${plural(n,'recording')} inside it will be removed. This cannot be undone.`))return;
-  for(const m of t.methods)for(const r of m.recs)await idbDel(STORE_BLOB,r.blobId);
+  for(const m of t.methods)for(const r of m.recs)await delAudio(r.blobId);
   f.topics=f.topics.filter(x=>x.id!==t.id); await save(); render(); toast('Topic deleted');}
 
 async function delMethod(t,m){
   if(!await askConfirm('Delete method',`“${m.name}” and its ${plural(m.recs.length,'recording')} will be removed. This cannot be undone.`))return;
-  for(const r of m.recs)await idbDel(STORE_BLOB,r.blobId);
+  for(const r of m.recs)await delAudio(r.blobId);
   t.methods=t.methods.filter(x=>x.id!==m.id); await save(); render(); toast('Method deleted');}
 
 async function delRec(m,r){
   if(!await askConfirm('Delete recording',`“${r.name}” will be removed. This cannot be undone.`))return;
   if(playingId===r.id)stopAudio();
-  await idbDel(STORE_BLOB,r.blobId);
+  await delAudio(r.blobId);
   m.recs=m.recs.filter(x=>x.id!==r.id); await save(); render(); toast('Recording deleted');}
 
-function stopAudio(){if(audio){audio.pause();try{URL.revokeObjectURL(audio.src);}catch(e){}audio=null;}playingId=null;}
+function stopAudio(){if(audio){audio.pause();if(audio._obj){try{URL.revokeObjectURL(audio.src);}catch(e){}}audio=null;}playingId=null;}
 
 async function play(r){
   if(playingId===r.id){stopAudio();render();return;}
   stopAudio();
-  const blob=await idbGet(STORE_BLOB,r.blobId);
-  if(!blob){toast('That audio is missing — restore a backup');return;}
-  audio=new Audio(URL.createObjectURL(blob));
+  const src=await getAudio(r.blobId);
+  if(!src){toast('That audio is missing — restore a backup');return;}
+  audio=new Audio(typeof src==='string'?src:URL.createObjectURL(src));
+  audio._obj=typeof src!=='string';
   audio.playbackRate=speed;
   audio.onended=()=>{stopAudio();render();};
   audio.play().catch(()=>{toast('Could not play this file');stopAudio();render();});
@@ -452,7 +505,7 @@ document.getElementById('recSave').onclick=async()=>{
   if(!nm){toast('Give this approach a name');document.getElementById('recName').focus();return;}
   if(!pendingBlob){toast('Record or upload audio first');return;}
   const blobId=uid();
-  await idbPut(STORE_BLOB,blobId,pendingBlob);
+  await putAudio(blobId,pendingBlob);
   recTarget.recs.push({id:uid(),name:nm,dur:pendingDur,ts:Date.now(),blobId,mime:pendingBlob.type||'audio/webm'});
   await save();document.getElementById('recDlg').close();render();toast('Saved');};
 
@@ -474,7 +527,8 @@ document.getElementById('exportBtn').onclick=async()=>{
   toast('Preparing the backup…');
   const blobs={};
   for(const f of tree)for(const t of f.topics)for(const m of t.methods)for(const r of m.recs){
-    const b=await idbGet(STORE_BLOB,r.blobId);if(!b)continue;
+    let b=await getAudio(r.blobId);if(!b)continue;
+    if(typeof b==='string'){try{b=await (await fetch(b)).blob();}catch(e){continue;}}
     blobs[r.blobId]=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(b);});}
   const url=URL.createObjectURL(new Blob([JSON.stringify({v:1,exported:Date.now(),tree,blobs})],{type:'application/json'}));
   const a=document.createElement('a');
@@ -491,25 +545,98 @@ document.getElementById('importFile').onchange=async e=>{
     const data=JSON.parse(await f.text());
     if(!Array.isArray(data.tree))throw new Error('bad');
     for(const k in (data.blobs||{})){
-      const r=await fetch(data.blobs[k]);await idbPut(STORE_BLOB,k,await r.blob());}
+      const r=await fetch(data.blobs[k]);await putAudio(k,await r.blob());}
     data.tree.forEach(fo=>{fo.id=fo.id||uid();tree.push(fo);});
     await save();render();toast('Backup imported');
   }catch(err){toast('That file could not be read');}};
 
+function showAuth(msg){
+  const d=document.getElementById('authDlg');
+  if(msg)document.getElementById('authMsg').textContent=msg;
+  document.getElementById('authErr').style.display='none';
+  d.showModal();
+  setTimeout(()=>document.getElementById('authEmail').focus(),30);}
+
+function authError(m){const e=document.getElementById('authErr');e.style.display='block';e.textContent=m;}
+
+async function doAuth(mode){
+  const email=document.getElementById('authEmail').value.trim();
+  const pass=document.getElementById('authPass').value;
+  if(!email||!pass){authError('Enter both your email and a password.');return;}
+  if(pass.length<6){authError('Password needs at least 6 characters.');return;}
+  const btn=document.getElementById(mode==='login'?'authLogin':'authSignup');
+  const was=btn.textContent; btn.textContent='Working…';
+  const {data,error}= mode==='login'
+    ? await sb.auth.signInWithPassword({email,password:pass})
+    : await sb.auth.signUp({email,password:pass});
+  btn.textContent=was;
+  if(error){authError(error.message);return;}
+  if(!data.session){authError('Check your inbox and confirm the email, then sign in.');return;}
+  user=data.user;
+  document.getElementById('authDlg').close();
+  await loadCloud();
+  render(); toast('Signed in');}
+
+async function loadCloud(){
+  const {data,error}=await sb.from('notebooks').select('tree').eq('user_id',user.id).maybeSingle();
+  if(error){toast('Could not load your notes — run the setup SQL in Supabase');tree=[];return;}
+  tree=(data&&Array.isArray(data.tree))?data.tree:[];
+  if(!data)await save();}
+
+function mountAccountBar(){
+  const bar=document.querySelector('.tools .set:last-child');
+  const who=document.createElement('span');
+  who.className='lbl'; who.style.marginRight='4px';
+  who.textContent=user?user.email:'';
+  const out=document.createElement('button');
+  out.textContent='Sign out';
+  out.onclick=async()=>{await sb.auth.signOut();location.reload();};
+  bar.insertBefore(who,bar.firstChild); bar.appendChild(out);}
+
+function warn(html){
+  const w=document.createElement('div');
+  w.className='alarm'; w.innerHTML=html;
+  document.querySelector('.sheet').insertBefore(w,document.querySelector('.crumb'));}
+
 (async()=>{
-  try{
-    db=await openDB();
-    tree=(await idbGet(STORE_META,'tree'))||[];
-    if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
-  }catch(e){
-    memoryMode=true;tree=[];
-    const w=document.createElement('div');
-    w.className='alarm';
-    w.innerHTML='<b>Nothing will be saved right now.</b><br>This browser blocks storage for pages opened straight off the disk. Open the published web address instead, where saving works normally. Everything on this page still works, but it will be lost on refresh.';
-    document.querySelector('.sheet').insertBefore(w,document.querySelector('.crumb'));
+  const configured=window.SUPABASE_URL&&window.SUPABASE_ANON_KEY&&window.supabase;
+  if(configured){
+    try{
+      sb=window.supabase.createClient(window.SUPABASE_URL,window.SUPABASE_ANON_KEY);
+      cloud=true;
+      const {data}=await sb.auth.getSession();
+      if(data&&data.session){
+        user=data.session.user;
+        await loadCloud();
+        mountAccountBar();
+      }else{
+        render();
+        showAuth();
+        document.getElementById('authLogin').onclick=()=>doAuth('login');
+        document.getElementById('authSignup').onclick=()=>doAuth('signup');
+        document.getElementById('authPass').onkeydown=e=>{if(e.key==='Enter')doAuth('login');};
+        return;
+      }
+    }catch(e){cloud=false;}
+  }
+  if(!cloud){
+    try{
+      db=await openDB();
+      tree=(await idbGet(STORE_META,'tree'))||[];
+      if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+      if(configured===false&&location.protocol!=='file:')
+        warn('<b>Sync is not switched on.</b><br>This copy saves to this browser only. Add your Supabase keys to <code>config.js</code> to sync across devices.');
+    }catch(e){
+      memoryMode=true;tree=[];
+      warn('<b>Nothing will be saved right now.</b><br>This browser blocks storage for pages opened straight off the disk. Open the published web address instead, where saving works normally.');
+    }
   }
   render();
 })();
+
+document.getElementById('authLogin').onclick=()=>doAuth('login');
+document.getElementById('authSignup').onclick=()=>doAuth('signup');
+document.getElementById('authPass').onkeydown=e=>{if(e.key==='Enter')doAuth('login');};
 </script>
 </body>
 </html>
